@@ -5,7 +5,7 @@ from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml import parse_xml
-from docx.oxml.ns import nsdecls
+from docx.oxml.ns import nsdecls, qn
 
 from src.models import FormattingPlan
 
@@ -30,10 +30,32 @@ def apply_cell_styling(cell, bg_hex: str = "F4F4F4", border_hex: str = "D3D3D3")
     tcPr.append(borders)
 
 
+def set_monospaced_run_font(run, font_name: str, size_pt: float, color_rgb=(0, 0, 0)):
+    """
+    Forces all characters in a code run (including operators, brackets, and numbers)
+    to strictly use the monospaced font without Word substituting body fonts.
+    """
+    run.font.name = font_name
+    run.font.size = Pt(size_pt)
+    run.font.color.rgb = RGBColor(color_rgb[0], color_rgb[1], color_rgb[2])
+
+    rPr = run._r.get_or_add_rPr()
+    rFonts = rPr.get_or_add_rFonts()
+    rFonts.set(qn('w:ascii'), font_name)
+    rFonts.set(qn('w:hAnsi'), font_name)
+    rFonts.set(qn('w:cs'), font_name)
+
+
+def add_page_number_to_run(run):
+    """Inserts a dynamic Word PAGE field into a run."""
+    fldSimple = parse_xml(r'<w:fldSimple %s w:instr="PAGE"/>' % nsdecls('w'))
+    run._r.append(fldSimple)
+
+
 def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
     """
     Deterministically renders a Word .docx document from a FormattingPlan.
-    Supports both standard academic and University Practical File profiles.
+    Supports preset profiles and dynamic AI-extracted profiles.
     """
     doc = Document()
     section = doc.sections[0]
@@ -78,6 +100,13 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
         run_r.font.name = h_font
         run_r.font.size = Pt(h_size)
         run_r.font.color.rgb = RGBColor(h_color[0], h_color[1], h_color[2])
+    elif header_layout == "CENTERED" and plan.subject_name:
+        hp = header.paragraphs[0]
+        hp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        hrun = hp.add_run(plan.subject_name)
+        hrun.font.name = h_font
+        hrun.font.size = Pt(h_size)
+        hrun.font.color.rgb = RGBColor(h_color[0], h_color[1], h_color[2])
     elif plan.student_name or plan.roll_number:
         hp = header.paragraphs[0]
         hp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -92,11 +121,12 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
         hrun.font.size = Pt(plan.typography.get("header", {}).get("size_pt", 9))
         hrun.font.color.rgb = RGBColor(128, 128, 128)
 
-    # 3. Footer
+    # 3. Footer Handling (Flexible, Not Hardcoded)
     footer = section.footer
-    footer_layout = plan.footer_config.get("layout", "")
+    footer_layout = plan.footer_config.get("layout", "PAGE_NUMBER")
     f_font = plan.footer_config.get("font", "Times New Roman")
-    f_size = plan.footer_config.get("size_pt", 10.5)
+    f_size = plan.footer_config.get("size_pt", 10)
+    f_color = plan.footer_config.get("color_rgb", (100, 100, 100))
 
     if footer_layout == "STUDENT_STAMP" and (plan.student_name or plan.roll_number):
         fp = footer.paragraphs[0]
@@ -123,14 +153,39 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
             s_run.font.name = f_font
             s_run.font.size = Pt(f_size)
             s_run.font.color.rgb = RGBColor(0, 0, 0)
-    else:
+
+    elif footer_layout == "PAGE_NUMBER":
         fp = footer.paragraphs[0]
         fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        frun = fp.add_run("Department of Computer Science & Engineering — Lab Record")
-        frun.font.name = plan.typography.get("footer", {}).get("font", "Calibri")
-        frun.font.size = Pt(plan.typography.get("footer", {}).get("size_pt", 8.5))
+        frun = fp.add_run("Page ")
+        frun.font.name = f_font
+        frun.font.size = Pt(f_size)
+        frun.font.color.rgb = RGBColor(f_color[0], f_color[1], f_color[2])
+        add_page_number_to_run(frun)
+
+    elif footer_layout == "CUSTOM_TEXT":
+        custom_text = plan.footer_config.get("text") or "Lab Record"
+        fp = footer.paragraphs[0]
+        fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        frun = fp.add_run(custom_text)
+        frun.font.name = f_font
+        frun.font.size = Pt(f_size)
         frun.font.italic = True
-        frun.font.color.rgb = RGBColor(160, 160, 160)
+        frun.font.color.rgb = RGBColor(f_color[0], f_color[1], f_color[2])
+
+    elif footer_layout == "NONE":
+        # Completely empty footer
+        pass
+
+    else:
+        # Default: centered page number
+        fp = footer.paragraphs[0]
+        fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        frun = fp.add_run("Page ")
+        frun.font.name = f_font
+        frun.font.size = Pt(f_size)
+        frun.font.color.rgb = RGBColor(f_color[0], f_color[1], f_color[2])
+        add_page_number_to_run(frun)
 
     # 4. Render Nodes
     for item in plan.nodes:
@@ -198,6 +253,8 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
         elif node_type == "code_block":
             boxed = style.get("boxed", True)
             code_lines = item["code"].split("\n")
+            code_font = style.get("font", "Consolas")
+            code_size = style.get("size_pt", 10)
 
             if boxed:
                 # Render code inside a single-cell table with background shading
@@ -222,9 +279,7 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
                         cp.paragraph_format.line_spacing = 1.0
 
                     crun = cp.add_run(cline)
-                    crun.font.name = style.get("font", "Consolas")
-                    crun.font.size = Pt(style.get("size_pt", 9.5))
-                    crun.font.color.rgb = RGBColor(30, 30, 30)
+                    set_monospaced_run_font(crun, code_font, 9.5, (30, 30, 30))
 
                 spacer = doc.add_paragraph()
                 spacer.paragraph_format.space_after = Pt(6)
@@ -237,9 +292,7 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
                     p.paragraph_format.space_before = Pt(0)
                     p.paragraph_format.space_after = Pt(1 if idx < len(code_lines) - 1 else 6)
                     crun = p.add_run(cline)
-                    crun.font.name = style.get("font", "Consolas")
-                    crun.font.size = Pt(style.get("size_pt", 10))
-                    crun.font.color.rgb = RGBColor(0, 0, 0)
+                    set_monospaced_run_font(crun, code_font, code_size, (0, 0, 0))
 
         elif node_type == "list":
             items = item.get("items", [])

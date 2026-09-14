@@ -114,7 +114,17 @@ if "Extract Rules Automatically" in profile_mode:
         active_profile = st.session_state.get("extracted_profile", get_university_practical_profile())
         extracted_msg = st.session_state.get("extracted_msg", "")
         
-        st.success(f"✅ {extracted_msg}")
+        col_st1, col_st2 = st.columns([3, 1])
+        with col_st1:
+            st.success(f"✅ {extracted_msg}")
+        with col_st2:
+            if st.button("🗑️ Clear Example", help="Remove this example and reset to default rules"):
+                st.session_state.pop("extracted_profile", None)
+                st.session_state.pop("extracted_msg", None)
+                st.session_state.pop("last_ref_file", None)
+                st.session_state.pop("last_used_key", None)
+                st.rerun()
+
         with st.expander("🔍 View Extracted Formatting Rules", expanded=False):
             st.json({
                 "Profile Name": active_profile.get("profile_name"),
@@ -125,7 +135,7 @@ if "Extract Rules Automatically" in profile_mode:
                 "Block Headings": active_profile.get("block_headings"),
             })
     else:
-        st.info("ℹ️ Upload a sample file above, or the system will default to University Practical File rules.")
+        st.info("ℹ️ Upload a sample file above, or the system will use the default University Practical File rules.")
         active_profile = get_university_practical_profile()
 else:
     # Preset Mode
@@ -161,6 +171,25 @@ with col_meta2:
     class_section = st.text_input("Class / Section", value="IT-2", placeholder="e.g. IT-2")
 with col_meta3:
     roll_number = st.text_input("Roll Number", value="19", placeholder="e.g. 19")
+
+col_foot1, col_foot2 = st.columns([1.5, 1.5])
+with col_foot1:
+    footer_choice = st.selectbox(
+        "📄 Footer Style",
+        options=[
+            "Auto (Detect from Profile)",
+            "Student Stamp (Name, Class, Roll No at bottom)",
+            "Page Numbering (Page X)",
+            "Custom Text",
+            "None (No Footer)"
+        ],
+        index=0,
+        help="Choose the footer format for your document."
+    )
+with col_foot2:
+    custom_footer_text = ""
+    if footer_choice == "Custom Text":
+        custom_footer_text = st.text_input("Custom Footer Text", value="Department of Information Technology")
 
 st.markdown("### 📝 Paste Raw Lab Content")
 default_placeholder = (
@@ -300,8 +329,22 @@ if generate_btn:
             # 5. Missing Section Auditor (Warnings only, strictly no fabrication)
             missing_warnings = audit_missing_sections(ast)
 
-            # 6. Apply Active Profile & Formatting Planner
-            formatting_plan = create_formatting_plan(ast, custom_profile=active_profile)
+            # 6. Apply Active Profile & Formatting Planner with user overrides
+            custom_prof = dict(active_profile)
+            custom_prof["typography"] = dict(custom_prof.get("typography", {}))
+            custom_prof["typography"]["footer"] = dict(custom_prof["typography"].get("footer", {}))
+
+            if "Student Stamp" in footer_choice:
+                custom_prof["typography"]["footer"]["layout"] = "STUDENT_STAMP"
+            elif "Page Numbering" in footer_choice:
+                custom_prof["typography"]["footer"]["layout"] = "PAGE_NUMBER"
+            elif "Custom Text" in footer_choice:
+                custom_prof["typography"]["footer"]["layout"] = "CUSTOM_TEXT"
+                custom_prof["typography"]["footer"]["text"] = custom_footer_text
+            elif "None" in footer_choice:
+                custom_prof["typography"]["footer"]["layout"] = "NONE"
+
+            formatting_plan = create_formatting_plan(ast, custom_profile=custom_prof)
 
             # 7. DOCX Generation
             initial_docx_bytes = generate_docx_from_plan(formatting_plan)

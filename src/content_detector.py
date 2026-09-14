@@ -131,6 +131,20 @@ def parse_section_content_to_nodes(
         inline_text=first_inline_chunk
     ))
 
+    # If the section is a dedicated code section, preserve the ENTIRE content as one contiguous CodeBlockNode
+    # This prevents blank lines inside code from fragmenting code into paragraphs with changing fonts!
+    if heading_text.upper().strip() in ["CODE", "IMPLEMENTATION", "SOURCE CODE", "PROGRAM", "C++ CODE", "JAVA CODE", "PYTHON CODE"]:
+        clean_code = raw_content.strip()
+        if clean_code:
+            if clean_code.startswith("```") and clean_code.endswith("```"):
+                c_lines = clean_code.split("\n")
+                lang = c_lines[0].replace("```", "").strip() or "text"
+                clean_code = "\n".join(c_lines[1:-1])
+            else:
+                lang = detect_programming_language(clean_code)
+            nodes.append(CodeBlockNode(code=clean_code, language=lang))
+        return nodes
+
     if not remaining_chunks and not (heading_text.upper() in ["OUTPUT", "SCREENSHOT"] and uploaded_image_bytes):
         return nodes
 
