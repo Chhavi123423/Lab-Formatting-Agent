@@ -20,22 +20,42 @@ def create_formatting_plan(ast: DocumentAST, custom_profile: Dict[str, Any] = No
 
     # If document has a title, insert a Title element at the beginning
     if ast.title:
+        title_text = ast.title
+        if typo.get("title", {}).get("uppercase", True):
+            title_text = title_text.upper()
         planned_nodes.append({
             "type": "title",
-            "text": ast.title,
+            "text": title_text,
             "style": typo["title"]
         })
 
-    for node in ast.nodes:
+    idx = 0
+    total_nodes = len(ast.nodes)
+    while idx < total_nodes:
+        node = ast.nodes[idx]
         if isinstance(node, HeadingNode):
             level_key = f"h{min(max(node.level, 1), 3)}"
-            is_inline = node.is_inline or (node.text.upper() in inline_headings)
+            heading_text = node.text.strip()
+            if typo.get(level_key, {}).get("uppercase", True):
+                heading_text = heading_text.upper()
+
+            is_inline = node.is_inline or (node.text.upper().strip() in inline_headings)
+            inline_text = node.inline_text
+
+            # If the profile defines this heading as inline, but inline_text is empty,
+            # absorb the immediately following ParagraphNode onto the same line!
+            if is_inline and not inline_text and (idx + 1 < total_nodes):
+                next_node = ast.nodes[idx + 1]
+                if isinstance(next_node, ParagraphNode):
+                    inline_text = next_node.text
+                    idx += 1  # Skip the absorbed paragraph node
+
             planned_nodes.append({
                 "type": "heading",
-                "text": node.text,
+                "text": heading_text,
                 "level": node.level,
                 "is_inline": is_inline,
-                "inline_text": node.inline_text,
+                "inline_text": inline_text,
                 "style": typo[level_key],
                 "body_style": typo["body"],
             })
@@ -67,6 +87,7 @@ def create_formatting_plan(ast: DocumentAST, custom_profile: Dict[str, Any] = No
                 "mode": node.mode,
                 "style": typo["image"]
             })
+        idx += 1
 
     return FormattingPlan(
         profile_name=profile_name,

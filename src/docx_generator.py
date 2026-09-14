@@ -142,7 +142,10 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             p.paragraph_format.space_before = Pt(style.get("space_before_pt", 6))
             p.paragraph_format.space_after = Pt(style.get("space_after_pt", 12))
-            run = p.add_run(item["text"])
+            title_text = item["text"].strip()
+            if style.get("uppercase", True):
+                title_text = title_text.upper()
+            run = p.add_run(title_text)
             run.font.name = style.get("font", "Times New Roman")
             run.font.size = Pt(style.get("size_pt", 14))
             run.font.bold = True
@@ -159,7 +162,10 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
             p.paragraph_format.space_after = Pt(style.get("space_after_pt", 4))
             
             # Heading text (e.g. "AIM:" or "THEORY:")
-            head_str = item["text"].strip().rstrip(":") + ": "
+            head_label = item["text"].strip().rstrip(":")
+            if style.get("uppercase", True):
+                head_label = head_label.upper()
+            head_str = head_label + ": "
             run_head = p.add_run(head_str)
             run_head.font.name = style.get("font", "Times New Roman")
             run_head.font.size = Pt(style.get("size_pt", 12))
