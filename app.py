@@ -171,6 +171,11 @@ with col_meta2:
     class_section = st.text_input("Class / Section", value="IT-2", placeholder="e.g. IT-2")
 with col_meta3:
     roll_number = st.text_input("Roll Number", value="19", placeholder="e.g. 19")
+    enrollment_number = st.text_input(
+        "Enrollment Number",
+        value="",
+        placeholder="e.g. ENR20260019"
+    )
 
 col_foot1, col_foot2 = st.columns([1.5, 1.5])
 with col_foot1:
@@ -320,6 +325,7 @@ if generate_btn:
                 subject_code=subject_code,
                 student_name=student_name,
                 roll_number=roll_number,
+                enrollment_number=enrollment_number,
                 class_section=class_section,
                 raw_input_text=cleaned_text,
                 uploaded_image_bytes=image_bytes,

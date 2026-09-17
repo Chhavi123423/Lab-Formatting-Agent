@@ -204,6 +204,7 @@ def build_document_ast(
     raw_sections: Optional[List[dict]] = None,
     student_name: str = "",
     roll_number: str = "",
+    enrollment_number: str = "",
     title: str = "",
     subject_name: str = "",
     subject_code: str = "",
@@ -255,8 +256,8 @@ def build_document_ast(
         subject_code=subject_code,
         student_name=student_name,
         roll_number=roll_number,
+        enrollment_number=enrollment_number,
         class_section=class_section,
         nodes=ast_nodes,
         raw_input_text=raw_input_text,
     )
-

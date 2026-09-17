@@ -99,6 +99,7 @@ def create_formatting_plan(ast: DocumentAST, custom_profile: Dict[str, Any] = No
         subject_code=ast.subject_code,
         student_name=ast.student_name,
         roll_number=ast.roll_number,
+        enrollment_number=ast.enrollment_number,
         class_section=ast.class_section,
         nodes=planned_nodes
     )

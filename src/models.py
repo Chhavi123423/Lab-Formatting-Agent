@@ -51,6 +51,7 @@ class DocumentAST(BaseModel):
     subject_code: str = ""
     student_name: str = ""
     roll_number: str = ""
+    enrollment_number: str = ""
     class_section: str = ""
     nodes: List[ASTNode] = Field(default_factory=list)
     raw_input_text: str = ""
@@ -67,6 +68,7 @@ class FormattingPlan(BaseModel):
     subject_code: str = ""
     student_name: str = ""
     roll_number: str = ""
+    enrollment_number: str = ""
     class_section: str = ""
     nodes: List[Dict[str, Any]] = Field(default_factory=list)
 
@@ -83,4 +85,3 @@ class ValidationResult(BaseModel):
     checks_performed: List[str] = Field(default_factory=list)
     correction_attempted: bool = False
     correction_succeeded: bool = False
-

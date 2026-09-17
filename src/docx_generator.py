@@ -107,7 +107,7 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
         hrun.font.name = h_font
         hrun.font.size = Pt(h_size)
         hrun.font.color.rgb = RGBColor(h_color[0], h_color[1], h_color[2])
-    elif plan.student_name or plan.roll_number:
+    elif plan.student_name or plan.roll_number or plan.enrollment_number:
         hp = header.paragraphs[0]
         hp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         meta_runs = []
@@ -115,6 +115,8 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
             meta_runs.append(f"Name: {plan.student_name}")
         if plan.roll_number:
             meta_runs.append(f"Roll No: {plan.roll_number}")
+        if plan.enrollment_number:
+            meta_runs.append(f"Enrollment No: {plan.enrollment_number}")
         
         hrun = hp.add_run(" | ".join(meta_runs))
         hrun.font.name = plan.typography.get("header", {}).get("font", "Calibri")
@@ -128,7 +130,9 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
     f_size = plan.footer_config.get("size_pt", 10)
     f_color = plan.footer_config.get("color_rgb", (100, 100, 100))
 
-    if footer_layout == "STUDENT_STAMP" and (plan.student_name or plan.roll_number):
+    if footer_layout == "STUDENT_STAMP" and (
+        plan.student_name or plan.roll_number or plan.enrollment_number
+    ):
         fp = footer.paragraphs[0]
         fp.alignment = WD_ALIGN_PARAGRAPH.LEFT
         fp.paragraph_format.line_spacing = 1.0
@@ -142,6 +146,8 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
             stamp_lines.append(plan.class_section)
         if plan.roll_number:
             stamp_lines.append(f"Roll no: - {plan.roll_number}")
+        if plan.enrollment_number:
+            stamp_lines.append(f"Enrollment no: - {plan.enrollment_number}")
 
         for s_idx, s_line in enumerate(stamp_lines):
             curr_p = fp if s_idx == 0 else footer.add_paragraph()
