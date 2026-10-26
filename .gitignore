@@ -7,4 +7,9 @@ venv/
 *.docx
 temp/
 .pytest_cache/
+# Database (user data — never commit)
+lab_reports.db
+*.db
+# Uploaded temp files
+uploads/
 

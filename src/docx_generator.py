@@ -128,7 +128,7 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
     f_size = plan.footer_config.get("size_pt", 10)
     f_color = plan.footer_config.get("color_rgb", (100, 100, 100))
 
-    if footer_layout == "STUDENT_STAMP" and (plan.student_name or plan.roll_number):
+    if footer_layout == "STUDENT_STAMP" and (plan.student_name or plan.roll_number or plan.enrollment_number):
         fp = footer.paragraphs[0]
         fp.alignment = WD_ALIGN_PARAGRAPH.LEFT
         fp.paragraph_format.line_spacing = 1.0
@@ -142,6 +142,8 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
             stamp_lines.append(plan.class_section)
         if plan.roll_number:
             stamp_lines.append(f"Roll no: - {plan.roll_number}")
+        if plan.enrollment_number:
+            stamp_lines.append(f"Enrollment no: - {plan.enrollment_number}")
 
         for s_idx, s_line in enumerate(stamp_lines):
             curr_p = fp if s_idx == 0 else footer.add_paragraph()
@@ -335,6 +337,68 @@ def generate_docx_from_plan(plan: FormattingPlan) -> bytes:
                     crun.font.size = Pt(style.get("caption_size_pt", 9.5))
                     crun.font.italic = True
                     crun.font.color.rgb = RGBColor(100, 100, 100)
+
+        elif node_type == "table":
+            # Render a proper Word table (not flattened text)
+            headers = item.get("headers", [])
+            rows = item.get("rows", [])
+            caption = item.get("caption", "")
+            if not headers and not rows:
+                continue
+
+            num_cols = max(
+                len(headers),
+                max((len(r) for r in rows), default=0)
+            )
+            if num_cols == 0:
+                continue
+
+            num_rows = len(rows) + (1 if headers else 0)
+            tbl = doc.add_table(rows=num_rows, cols=num_cols)
+            tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+            tbl.autofit = True
+
+            row_offset = 0
+            body_font = plan.typography.get("body", {}).get("font", "Times New Roman")
+            body_size = plan.typography.get("body", {}).get("size_pt", 12)
+
+            if headers:
+                hdr_row = tbl.rows[0]
+                for ci, hdr_text in enumerate(headers[:num_cols]):
+                    cell = hdr_row.cells[ci]
+                    apply_cell_styling(cell, bg_hex="1F4E79", border_hex="1F4E79")
+                    p = cell.paragraphs[0]
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    run = p.add_run(str(hdr_text))
+                    run.font.bold = True
+                    run.font.name = body_font
+                    run.font.size = Pt(body_size - 1)
+                    run.font.color.rgb = RGBColor(255, 255, 255)
+                row_offset = 1
+
+            for ri, data_row in enumerate(rows):
+                tbl_row = tbl.rows[ri + row_offset]
+                bg = "F8F8F8" if ri % 2 == 1 else "FFFFFF"
+                for ci, cell_text in enumerate(data_row[:num_cols]):
+                    cell = tbl_row.cells[ci]
+                    apply_cell_styling(cell, bg_hex=bg, border_hex="CCCCCC")
+                    p = cell.paragraphs[0]
+                    run = p.add_run(str(cell_text))
+                    run.font.name = body_font
+                    run.font.size = Pt(body_size - 1)
+
+            spacer = doc.add_paragraph()
+            spacer.paragraph_format.space_after = Pt(4)
+
+            if caption:
+                cap_p = doc.add_paragraph()
+                cap_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                cap_p.paragraph_format.space_after = Pt(6)
+                crun = cap_p.add_run(caption)
+                crun.font.name = plan.typography.get("body", {}).get("font", "Times New Roman")
+                crun.font.size = Pt(9.5)
+                crun.font.italic = True
+                crun.font.color.rgb = RGBColor(100, 100, 100)
 
     # Return DOCX file content as bytes
     out_stream = io.BytesIO()

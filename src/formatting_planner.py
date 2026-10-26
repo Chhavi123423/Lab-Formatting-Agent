@@ -1,8 +1,20 @@
 from typing import Dict, Any, List
 from src.models import (
-    DocumentAST, FormattingPlan, HeadingNode, ParagraphNode, CodeBlockNode, ListNode, ImageNode
+    DocumentAST, FormattingPlan, HeadingNode, ParagraphNode, CodeBlockNode, ListNode, ImageNode, TableNode
 )
 from src.profiles.lab_profile import get_canonical_lab_profile
+
+# Lazy import to avoid circular — only used when table nodes arrive
+_TablePlaceholder = None
+def _get_table_placeholder():
+    global _TablePlaceholder
+    if _TablePlaceholder is None:
+        try:
+            from src.preview_renderer import _TablePlaceholder as TP
+            _TablePlaceholder = TP
+        except ImportError:
+            pass
+    return _TablePlaceholder
 
 
 def create_formatting_plan(ast: DocumentAST, custom_profile: Dict[str, Any] = None) -> FormattingPlan:
@@ -87,6 +99,25 @@ def create_formatting_plan(ast: DocumentAST, custom_profile: Dict[str, Any] = No
                 "mode": node.mode,
                 "style": typo["image"]
             })
+        elif isinstance(node, TableNode):
+            planned_nodes.append({
+                "type": "table",
+                "headers": node.headers,
+                "rows": node.rows,
+                "caption": node.caption,
+                "style": typo.get("body", {}),
+            })
+        else:
+            # Handle TablePlaceholder nodes from the workspace builder
+            TP = _get_table_placeholder()
+            if TP is not None and isinstance(node, TP):
+                planned_nodes.append({
+                    "type": "table",
+                    "headers": node.headers,
+                    "rows": node.rows,
+                    "caption": node.caption,
+                    "style": typo.get("body", {}),
+                })
         idx += 1
 
     return FormattingPlan(
@@ -99,6 +130,7 @@ def create_formatting_plan(ast: DocumentAST, custom_profile: Dict[str, Any] = No
         subject_code=ast.subject_code,
         student_name=ast.student_name,
         roll_number=ast.roll_number,
+        enrollment_number=ast.enrollment_number,
         class_section=ast.class_section,
         nodes=planned_nodes
     )

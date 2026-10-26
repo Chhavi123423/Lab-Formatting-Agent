@@ -73,3 +73,4 @@ def test_flexible_footer_options():
     doc_custom = Document(io.BytesIO(docx_custom))
     footer_custom_text = " ".join(p.text for p in doc_custom.sections[0].footer.paragraphs)
     assert "Department of IT — 2026" in footer_custom_text
+
